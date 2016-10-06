@@ -8,18 +8,20 @@
 
 import UIKit
 import GoogleMaps
-import MapKit
+import CoreData
 
 class ViewController: UIViewController, CLLocationManagerDelegate {
+    let moc = (UIApplication.sharedApplication().delegate as! AppDelegate).managedObjectContext
     var mapView: GMSMapView?
     var addressArray: [AnyObject] = []
     var noArray: [AnyObject] = []
+    var markers: [[String:AnyObject]] = [[:]]
     var int = 0
     var camera = GMSCameraPosition.cameraWithLatitude(23.284681, longitude: 118.158177, zoom: 6)
     let locationManager = CLLocationManager()
     var startLatitude: CLLocationDegrees?
     var startLongitude: CLLocationDegrees?
-    
+  
     override func viewDidLoad() {
         super.viewDidLoad()
         locationManager.delegate = self
@@ -45,7 +47,7 @@ class ViewController: UIViewController, CLLocationManagerDelegate {
     
     func backToMyPosition() {
         if startLatitude != nil && startLongitude != nil {
-            let sydney = GMSCameraPosition.cameraWithLatitude(startLatitude!, longitude: startLongitude!, zoom: 6)
+            let sydney = GMSCameraPosition.cameraWithLatitude(startLatitude!, longitude: startLongitude!, zoom: 16)
             mapView!.animateToCameraPosition(sydney)
         }
     }
@@ -68,7 +70,6 @@ class ViewController: UIViewController, CLLocationManagerDelegate {
         let locValue:CLLocationCoordinate2D = manager.location!.coordinate
         startLatitude = locValue.latitude
         startLongitude = locValue.longitude
-//        print("locations = \(locValue.latitude) \(locValue.longitude)")
     }
     
     func getPositionInformation() {
@@ -79,65 +80,28 @@ class ViewController: UIViewController, CLLocationManagerDelegate {
                 if let data = ajaxString.parsedAsJson() as? [String: AnyObject] {
                     if let dangerous = data["result"]!["records"] as? [AnyObject] {
                         for information in dangerous {
-                            if let address = information["Address"] as? String {
-                                addressArray.insert(address, atIndex: addressArray.count)
-                            }
                             if let no = information["No"] as? Int {
                                 noArray.insert(no, atIndex: noArray.count)
+                                self.addProduct
+                            }
+                            if let address = information["Address"] as? String {
+                                addressArray.insert(address, atIndex: addressArray.count)
                             }
                         }
                     }
                 }
             } else { UIApplication.sharedApplication().networkActivityIndicatorVisible = false }
         }
-        geocodeAddressString()
     }
     
-    func geocodeAddressString() {
-        let geocoder = CLGeocoder()
-        geocoder.geocodeAddressString(addressArray[int] as! String, completionHandler: {
-            (placemarks:[CLPlacemark]?, error:NSError?) -> Void in
-            if error != nil {
-//                print("Error：\(error!.localizedDescription))")
-                if self.addressArray.count > self.int {
-                    self.geocodeAddressString()
-                } else {
-                    return
-                }
-            }
-            if let p = placemarks?[0] {
-                print("longitude：\(p.location!.coordinate.longitude)" + "latitude：\(p.location!.coordinate.latitude)")
-                let longitude = p.location!.coordinate.longitude
-                let latitude = p.location!.coordinate.latitude
-                if self.addressArray.count > self.int {
-                    self.addMarker(longitude, latitude: latitude, title: self.addressArray[self.int] as! String)
-                } else {
-                    return
-                }
-            } else {
-//                print("No placemarks!")
-                if self.addressArray.count > self.int {
-                    self.geocodeAddressString()
-                } else {
-                    return
-                }
-            }
-            self.int += 1
-        })
-    }
-    
-    func addMarker(longitude:Double, latitude:Double, title:String) {
-        dispatch_async(dispatch_get_main_queue(), {
-            let position = CLLocationCoordinate2DMake(latitude,longitude)
-            let marker = GMSMarker(position: position)
-            marker.title = title
-            marker.map = self.mapView
-            self.int += 1
-        })
-        if self.addressArray.count > self.int {
-            self.geocodeAddressString()
-        } else {
-            return
+    func addProduct(address:String, latitude:Double, longitude:Double) {
+        let product = NSEntityDescription.insertNewObjectForEntityForName("Product", inManagedObjectContext: self.moc) as? Product
+        product.name = name
+        product.price = price
+        do {
+            try self.moc.save()
+        }catch{
+            fatalError("Failure to save context: \(error)")
         }
     }
 }
